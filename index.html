@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YARA — Sales + Salary Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --background: #faf6f7;
+      --foreground: #1f0d12;
+      --card: #ffffff;
+      --card-foreground: #1f0d12;
+      --muted: #f0e4e7;
+      --muted-foreground: #73575f;
+      --primary: #801b2a;
+      --primary-hover: #681421;
+      --primary-foreground: #ffffff;
+      --primary-soft: rgba(128, 27, 42, 0.12);
+      --border: #e4d2d6;
+      --input: #dfc9ce;
+      --destructive: #ef4444;
+      --shadow: 0 10px 30px -10px rgba(128, 27, 42, 0.18);
+    }
+
+    html.dark {
+      --background: #0a0608;
+      --foreground: #f2eaec;
+      --card: #130b0e;
+      --card-foreground: #f2eaec;
+      --muted: #1d1015;
+      --muted-foreground: #9e878e;
+      --primary: #9e2a3b;
+      --primary-hover: #84202f;
+      --primary-foreground: #ffffff;
+      --primary-soft: rgba(158, 42, 59, 0.16);
+      --border: #2c181f;
+      --input: #26141b;
+      --destructive: #f87171;
+      --shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.65);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--background);
+      color: var(--foreground);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow-x: hidden;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* Subtle animated waves */
+    .bg-waves {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    @keyframes wave-drift {
+      0%, 100% { transform: translateX(0) translateY(0); }
+      50% { transform: translateX(-25%) translateY(4px); }
+    }
+
+    .wave-bottom {
+      position: absolute;
+      bottom: -80px;
+      left: 0;
+      width: 200%;
+      height: 320px;
+      color: var(--primary);
+      opacity: 0.06;
+      animation: wave-drift 16s ease-in-out infinite;
+    }
+
+    .wave-top {
+      position: absolute;
+      top: -80px;
+      right: 0;
+      width: 200%;
+      height: 320px;
+      color: var(--primary);
+      opacity: 0.05;
+      animation: wave-drift 20s ease-in-out infinite reverse;
+    }
+
+    /* Top Header */
+    .top-bar {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      color: var(--primary);
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-family: 'Great Vibes', cursive;
+      font-size: 26px;
+      font-weight: 400;
+      color: var(--primary);
+      line-height: 1;
+      margin-bottom: -2px;
+    }
+
+    .brand-sub {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted-foreground);
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 9999px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--foreground);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .icon-btn:hover {
+      background-color: var(--muted);
+      border-color: var(--border);
+    }
+
+    /* Main Content */
+    .main-container {
+      position: relative;
+      z-index: 10;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 16px 64px;
+    }
+
+    .center-script {
+      font-family: 'Great Vibes', cursive;
+      font-size: 44px;
+      font-weight: 400;
+      color: var(--primary);
+      margin-bottom: 4px;
+      text-align: center;
+    }
+
+    .center-subtitle {
+      font-size: 14px;
+      color: var(--muted-foreground);
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    /* Profile Grid */
+    .profiles-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 16px;
+      max-width: 640px;
+      width: 100%;
+    }
+
+    .profile-card {
+      width: 124px;
+      padding: 18px 12px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background-color: var(--card);
+      color: var(--card-foreground);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      text-align: center;
+    }
+
+    .profile-card:hover {
+      border-color: var(--primary);
+      box-shadow: var(--shadow);
+      transform: translateY(-2px);
+    }
+
+    .profile-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 9999px;
+      background-color: var(--primary-soft);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .profile-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .profile-card:hover .profile-avatar {
+      background-color: var(--primary);
+      color: var(--primary-foreground);
+    }
+
+    .profile-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--foreground);
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .profile-role {
+      font-size: 11px;
+      color: var(--muted-foreground);
+      text-transform: capitalize;
+    }
+
+    .profile-card.add-card {
+      border: 2px dashed var(--border);
+      background-color: transparent;
+      color: var(--muted-foreground);
+      justify-content: center;
+    }
+
+    .profile-card.add-card:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .add-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 9999px;
+      background-color: var(--muted);
+      color: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    /* Skeleton loader */
+    .skeleton-card {
+      width: 124px;
+      height: 140px;
+      border-radius: 16px;
+      background-color: var(--muted);
+      animation: pulse 1.5s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Modal Dialog */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background-color: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-content {
+      position: relative;
+      width: 100%;
+      max-width: 380px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background-color: var(--background);
+      padding: 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      animation: modal-in 0.18s ease-out;
+    }
+
+    @keyframes modal-in {
+      from { opacity: 0; transform: scale(0.95) translateY(4px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--muted-foreground);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .modal-close:hover {
+      color: var(--foreground);
+      background-color: var(--muted);
+    }
+
+    .modal-header-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-header-left {
+      margin-bottom: 18px;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--foreground);
+    }
+
+    .modal-desc {
+      font-size: 13px;
+      color: var(--muted-foreground);
+      margin-top: 4px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--foreground);
+      margin-bottom: 6px;
+    }
+
+    .input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 12px;
+      width: 16px;
+      height: 16px;
+      color: var(--muted-foreground);
+      pointer-events: none;
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      height: 40px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: 1px solid var(--input);
+      background-color: transparent;
+      color: var(--foreground);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .form-select option {
+      background-color: var(--card);
+      color: var(--foreground);
+    }
+
+    .form-input.with-icon {
+      padding-left: 38px;
+      padding-right: 38px;
+    }
+
+    .form-input:focus, .form-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--primary-soft);
+    }
+
+    .eye-btn {
+      position: absolute;
+      right: 10px;
+      background: none;
+      border: none;
+      color: var(--muted-foreground);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+    }
+
+    .eye-btn:hover {
+      color: var(--foreground);
+    }
+
+    .error-text {
+      font-size: 12px;
+      color: var(--destructive);
+      margin-top: 6px;
+      display: none;
+    }
+
+    .error-text.show {
+      display: block;
+    }
+
+    .btn-primary {
+      width: 100%;
+      height: 40px;
+      border-radius: 8px;
+      border: none;
+      background-color: var(--primary);
+      color: var(--primary-foreground);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.15s ease, opacity 0.15s ease;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .sync-pill {
+      margin-top: 28px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 12px;
+      background-color: var(--primary-soft);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted-foreground);
+    }
+
+    .sync-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      background-color: #22c55e;
+    }
+
+    .sync-dot.connecting {
+      background-color: #eab308;
+      animation: pulse 1s infinite;
+    }
+  </style>
+</head>
+<body>
+  <!-- Animated Wave Background -->
+  <div class="bg-waves">
+    <svg class="wave-bottom" viewBox="0 0 1440 320" preserveAspectRatio="none">
+      <path fill="currentColor" d="M0,224L48,213.3C96,203,192,181,288,186.7C384,192,480,224,576,229.3C672,235,768,213,864,192C960,171,1056,149,1152,160C1248,171,1344,213,1392,234.7L1440,256V320H0Z"></path>
+    </svg>
+    <svg class="wave-top" viewBox="0 0 1440 320" preserveAspectRatio="none">
+      <path fill="currentColor" d="M0,96L48,112C96,128,192,160,288,165.3C384,171,480,149,576,138.7C672,128,768,128,864,149.3C960,171,1056,213,1152,213.3C1248,213,1344,171,1392,149.3L1440,128V0H0Z"></path>
+    </svg>
+  </div>
+
+  <!-- Top Bar -->
+  <header class="top-bar">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>
+        <path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>
+        <path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>
+      </svg>
+      <div>
+        <h1 class="brand-title">YARA</h1>
+        <p class="brand-sub">Sales Tracker</p>
+      </div>
+    </div>
+
+    <button class="icon-btn" id="themeToggleBtn" title="Toggle theme" aria-label="Toggle theme">
+      <svg id="themeIconMoon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+      </svg>
+      <svg id="themeIconSun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+        <circle cx="12" cy="12" r="4"/>
+        <path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Center Profile Picker -->
+  <main class="main-container">
+    <h2 class="center-script">YARA</h2>
+    <p class="center-subtitle">Who's using YARA?</p>
+
+    <div id="profilesGrid" class="profiles-grid">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>
+
+    <div class="sync-pill">
+      <span id="syncDot" class="sync-dot connecting"></span>
+      <span id="syncText">Connecting to cloud...</span>
+    </div>
+  </main>
+
+  <!-- PIN / Password Sign In Modal -->
+  <div id="loginModal" class="modal-backdrop">
+    <div class="modal-content">
+      <button type="button" class="modal-close" id="closeLoginModal" aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <div class="modal-header-center">
+        <div id="modalAvatar" class="profile-avatar" style="margin-bottom: 12px;">R</div>
+        <h3 id="modalUsername" class="modal-title">YARA</h3>
+        <p class="modal-desc">Enter your PIN / password to sign in</p>
+      </div>
+      <form id="pinLoginForm">
+        <div class="form-group">
+          <label class="form-label" for="pinInput">Enter PIN</label>
+          <div class="input-wrap">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <input type="password" id="pinInput" class="form-input with-icon" placeholder="Enter your PIN or password" autocomplete="current-password" required>
+            <button type="button" class="eye-btn" id="togglePinBtn" aria-label="Show password">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+          <p id="loginError" class="error-text"></p>
+        </div>
+        <button type="submit" id="signInBtn" class="btn-primary">Sign In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Profile Modal -->
+  <div id="addProfileModal" class="modal-backdrop">
+    <div class="modal-content">
+      <button type="button" class="modal-close" id="closeAddProfileModal" aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <div class="modal-header-left">
+        <h3 class="modal-title">Add Profile</h3>
+        <p class="modal-desc">Create a new user profile</p>
+      </div>
+      <form id="addProfileForm">
+        <div class="form-group">
+          <label class="form-label" for="newUsername">Username</label>
+          <input type="text" id="newUsername" class="form-input" placeholder="Enter username (e.g. @admin)" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="newPin">PIN / Password</label>
+          <input type="password" id="newPin" class="form-input" placeholder="Enter PIN or password" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="newRole">Role</label>
+          <select id="newRole" class="form-select">
+            <option value="admin">Admin / Agent</option>
+            <option value="owner" id="ownerRoleOption">Owner</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="newAvatar">Profile Picture (Image URL or Upload)</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="url" id="newAvatar" class="form-input" placeholder="Paste Image URL or upload">
+            <label class="btn-primary" style="display:inline-flex; align-items:center; justify-content:center; width:auto; padding:0 12px; cursor:pointer; font-size:12px; white-space:nowrap; height:40px;">
+              📁 Upload
+              <input type="file" id="newAvatarFile" accept="image/*" style="display:none;">
+            </label>
+          </div>
+          <div id="newAvatarPreviewWrap" style="display:none; margin-top:8px; align-items:center; gap:8px;">
+            <img id="newAvatarPreview" src="" style="width:40px; height:40px; border-radius:9999px; object-fit:cover; border:1px solid var(--border);">
+            <span style="font-size:12px; color:var(--muted-foreground);">Photo attached</span>
+          </div>
+        </div>
+        <p id="addProfileError" class="error-text" style="margin-bottom: 12px;"></p>
+        <button type="submit" id="createProfileBtn" class="btn-primary">Create Profile</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <script>
+    // Theme initialization (default to dark to match reference format)
+    (function initTheme() {
+      const saved = localStorage.getItem('theme') || 'dark';
+      if (saved === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else {
+        document.documentElement.classList.add('dark');
+      }
+      updateThemeIcons();
+    })();
+
+    function updateThemeIcons() {
+      const isDark = document.documentElement.classList.contains('dark');
+      const moon = document.getElementById('themeIconMoon');
+      const sun = document.getElementById('themeIconSun');
+      if (moon && sun) {
+        moon.style.display = isDark ? 'block' : 'none';
+        sun.style.display = isDark ? 'none' : 'block';
+      }
+    }
+
+    document.getElementById('themeToggleBtn').addEventListener('click', () => {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      updateThemeIcons();
+    });
+
+    // Firebase Configuration
+    const APP_NAME = 'yara';
+        // ========================================================
+    // 🔥 FIREBASE CONFIGURATION (Replace here when you share new Firebase)
+    // ========================================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyDKkWYavtCU1JE5JlvUXHSr90MqqisGtgM",
+      authDomain: "maisonetoile-5eee1.firebaseapp.com",
+      databaseURL: "https://maisonetoile-5eee1-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "maisonetoile-5eee1",
+      storageBucket: "maisonetoile-5eee1.firebasestorage.app",
+      messagingSenderId: "902250837280",
+      appId: "1:902250837280:web:ce9c7c919aa40019fdd345",
+      measurementId: "G-ZGGVE9R6FB"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    function getRef(path) {
+      return database.ref(`${APP_NAME}/${path}`);
+    }
+
+    function sanitizeFirebaseKey(key) {
+      return key.replace(/[.#$[\]\/]/g, '_');
+    }
+
+    function hashPassword(password) {
+      let hash = 0;
+      for (let i = 0; i < password.length; i++) {
+        const char = password.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      return hash.toString(36);
+    }
+
+    // Connection Status
+    const syncDot = document.getElementById('syncDot');
+    const syncText = document.getElementById('syncText');
+    database.ref('.info/connected').on('value', (snap) => {
+      if (snap.val() === true) {
+        syncDot.classList.remove('connecting');
+        syncText.textContent = 'Synced with cloud';
+      } else {
+        syncDot.classList.add('connecting');
+        syncText.textContent = 'Connecting to cloud...';
+      }
+    });
+
+    // Sync custom Shop Name if configured by Owner
+    getRef('settings/owner/shopConfig').on('value', (snap) => {
+      const cfg = snap.val();
+      if (cfg && cfg.shopName) {
+        const name = cfg.shopName.trim();
+        document.title = `${name} - Sales Tracker`;
+        const brandTitle = document.querySelector('.brand-title');
+        const centerScript = document.querySelector('.center-script');
+        const centerSub = document.querySelector('.center-subtitle');
+        if (brandTitle) brandTitle.textContent = name;
+        if (centerScript) centerScript.textContent = name;
+        if (centerSub) centerSub.textContent = `Who's using ${name}?`;
+      }
+    });
+
+    // Check active session
+    window.addEventListener('DOMContentLoaded', () => {
+      const session = localStorage.getItem('session');
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          if (parsed && parsed.username && parsed.appName === APP_NAME) {
+            window.location.href = 'dashboard.html';
+            return;
+          } else {
+            localStorage.removeItem('session');
+          }
+        } catch (e) {
+          localStorage.removeItem('session');
+        }
+      }
+    });
+
+    // Load Profiles
+    let profilesList = [];
+    let selectedProfile = null;
+    let avatarsCache = {};
+
+    // Listen to user avatars in settings
+    getRef('settings').on('value', (snap) => {
+      const data = snap.val() || {};
+      avatarsCache = {};
+      Object.keys(data).forEach(k => {
+        if (data[k] && data[k].avatar) {
+          avatarsCache[k] = data[k].avatar;
+        }
+      });
+      renderProfiles();
+    });
+
+    getRef('users').on('value', (snapshot) => {
+      
+      const usersObj = snapshot.val() || {};
+      if (!snapshot.exists() || Object.keys(usersObj).length === 0) {
+        const defaultOwner = {
+          id: Date.now(),
+          username: 'yaraen',
+          customName: '@yaraen',
+          password: hashPassword('zeroeight'),
+          plainPassword: 'zeroeight',
+          role: 'owner',
+          commissionMode: 'bracket',
+          profitPercent: 20,
+          createdDate: new Date().toISOString().split('T')[0],
+          createdAt: new Date().toISOString()
+        };
+        getRef('users/yaraen').set(defaultOwner);
+        return;
+      }
+
+      profilesList = Object.entries(usersObj).map(([key, val]) => ({
+        key,
+        ...val
+      }));
+      // Sort owner first, then alphabetically
+      profilesList.sort((a, b) => {
+        if (a.role === 'owner' && b.role !== 'owner') return -1;
+        if (a.role !== 'owner' && b.role === 'owner') return 1;
+        return (a.customName || a.username || '').localeCompare(b.customName || b.username || '');
+      });
+      renderProfiles();
+    });
+
+    function renderProfiles() {
+      const grid = document.getElementById('profilesGrid');
+      if (!grid) return;
+
+      const hasOwner = profilesList.some(p => (p.role || '').toLowerCase() === 'owner');
+      const ownerOpt = document.getElementById('ownerRoleOption');
+      if (ownerOpt) {
+        ownerOpt.style.display = hasOwner ? 'none' : 'block';
+      }
+
+      const cardsHtml = profilesList.map((profile, idx) => {
+        const displayName = (profile.customName || profile.username || 'User').replace(/^@/, '');
+        const initial = (displayName[0] || '?').toUpperCase();
+        const roleLabel = (profile.role || 'admin').toLowerCase() === 'owner' ? 'Owner' : 'Admin';
+        const avatarUrl = profile.avatar || avatarsCache[profile.key] || avatarsCache[profile.username];
+        const avatarInner = avatarUrl
+          ? `<img src="${avatarUrl}" alt="${displayName}">`
+          : initial;
+
+        return `
+          <button type="button" class="profile-card" data-idx="${idx}">
+            <div class="profile-avatar">${avatarInner}</div>
+            <span class="profile-name">${displayName}</span>
+            <span class="profile-role">${roleLabel}</span>
+          </button>
+        `;
+      }).join('');
+
+      const addCardHtml = `
+        <button type="button" class="profile-card add-card" id="openAddProfileBtn">
+          <div class="add-avatar">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14"/><path d="M12 5v14"/>
+            </svg>
+          </div>
+          <span class="profile-name" style="color:inherit;">Add Profile</span>
+        </button>
+      `;
+
+      grid.innerHTML = cardsHtml + addCardHtml;
+
+      grid.querySelectorAll('.profile-card:not(.add-card)').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const index = parseInt(btn.getAttribute('data-idx'), 10);
+          openLoginModal(profilesList[index]);
+        });
+      });
+
+      const addBtn = document.getElementById('openAddProfileBtn');
+      if (addBtn) {
+        addBtn.addEventListener('click', openAddProfileModal);
+      }
+    }
+
+    // Login Modal Logic
+    const loginModal = document.getElementById('loginModal');
+    const pinInput = document.getElementById('pinInput');
+    const loginError = document.getElementById('loginError');
+
+    function openLoginModal(profile) {
+      selectedProfile = profile;
+      const displayName = (profile.customName || profile.username || 'User').replace(/^@/, '');
+      const initial = (displayName[0] || '?').toUpperCase();
+      const avatarUrl = profile.avatar || avatarsCache[profile.key] || avatarsCache[profile.username];
+      const modalAvatar = document.getElementById('modalAvatar');
+
+      if (avatarUrl) {
+        modalAvatar.innerHTML = `<img src="${avatarUrl}" alt="${displayName}">`;
+      } else {
+        modalAvatar.textContent = initial;
+      }
+
+      document.getElementById('modalUsername').textContent = displayName;
+      pinInput.value = '';
+      loginError.textContent = '';
+      loginError.classList.remove('show');
+      loginModal.classList.add('open');
+      setTimeout(() => pinInput.focus(), 50);
+    }
+
+    function closeLoginModal() {
+      loginModal.classList.remove('open');
+      selectedProfile = null;
+    }
+
+    document.getElementById('closeLoginModal').addEventListener('click', closeLoginModal);
+    loginModal.addEventListener('click', (e) => {
+      if (e.target === loginModal) closeLoginModal();
+    });
+
+    document.getElementById('togglePinBtn').addEventListener('click', () => {
+      pinInput.type = pinInput.type === 'password' ? 'text' : 'password';
+      pinInput.focus();
+    });
+
+    document.getElementById('pinLoginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!selectedProfile) return;
+
+      const entered = pinInput.value.trim();
+      if (!entered) return;
+
+      const signInBtn = document.getElementById('signInBtn');
+      signInBtn.disabled = true;
+      signInBtn.textContent = 'Signing in...';
+      loginError.classList.remove('show');
+
+      try {
+        const userSnap = await getRef(`users/${selectedProfile.key}`).once('value');
+        const userData = userSnap.val() || selectedProfile;
+        const hashedEntered = hashPassword(entered);
+
+        if (userData.password !== hashedEntered && userData.password !== entered) {
+          throw new Error('Incorrect PIN or password');
+        }
+
+        const session = {
+          appName: APP_NAME,
+          id: userData.id || selectedProfile.key || userData.username,
+          username: userData.username,
+          role: userData.role,
+          customName: userData.customName || userData.username,
+          commissionMode: userData.commissionMode || 'bracket',
+          profitPercent: userData.profitPercent || 20,
+          loginTime: new Date().toISOString()
+        };
+
+        localStorage.setItem('session', JSON.stringify(session));
+        window.location.href = 'dashboard.html';
+      } catch (err) {
+        loginError.textContent = err.message || 'Sign in failed';
+        loginError.classList.add('show');
+      } finally {
+        signInBtn.disabled = false;
+        signInBtn.textContent = 'Sign In';
+      }
+    });
+
+    // Add Profile Modal Logic
+    const addProfileModal = document.getElementById('addProfileModal');
+    const addProfileError = document.getElementById('addProfileError');
+
+    function openAddProfileModal() {
+      document.getElementById('newUsername').value = '';
+      document.getElementById('newPin').value = '';
+      if (document.getElementById('newAvatar')) document.getElementById('newAvatar').value = '';
+      if (document.getElementById('newAvatarPreviewWrap')) document.getElementById('newAvatarPreviewWrap').style.display = 'none';
+      const hasOwner = profilesList.some(p => (p.role || '').toLowerCase() === 'owner');
+      document.getElementById('newRole').value = hasOwner ? 'admin' : 'owner';
+      addProfileError.textContent = '';
+      addProfileError.classList.remove('show');
+      addProfileModal.classList.add('open');
+      setTimeout(() => document.getElementById('newUsername').focus(), 50);
+    }
+
+    function closeAddProfileModal() {
+      addProfileModal.classList.remove('open');
+    }
+
+    document.getElementById('closeAddProfileModal').addEventListener('click', closeAddProfileModal);
+    addProfileModal.addEventListener('click', (e) => {
+      if (e.target === addProfileModal) closeAddProfileModal();
+    });
+
+    document.getElementById('addProfileForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      let rawUsername = document.getElementById('newUsername').value.trim();
+      const rawPin = document.getElementById('newPin').value.trim();
+      const role = document.getElementById('newRole').value || 'admin';
+
+      if (!rawUsername || !rawPin) return;
+
+      const customName = rawUsername.replace(/^@/, '');
+      const username = rawUsername.replace(/^@/, '');
+      const userKey = sanitizeFirebaseKey(username);
+
+      const rawAvatar = document.getElementById('newAvatar')?.value.trim() || '';
+      const createBtn = document.getElementById('createProfileBtn');
+      createBtn.disabled = true;
+      createBtn.textContent = 'Creating...';
+      addProfileError.classList.remove('show');
+
+      try {
+        const existing = await getRef(`users/${userKey}`).once('value');
+        if (existing.exists()) {
+          throw new Error('Username already exists');
+        }
+
+        await getRef(`users/${userKey}`).set({
+          id: Date.now(),
+          username,
+          customName,
+          password: hashPassword(rawPin),
+          plainPassword: rawPin,
+          role,
+          avatar: rawAvatar,
+          commissionMode: 'bracket',
+          profitPercent: 20,
+          createdDate: new Date().toISOString().split('T')[0],
+          createdAt: new Date().toISOString()
+        });
+        if (rawAvatar) {
+          await getRef(`settings/${userKey}`).update({ avatar: rawAvatar });
+        }
+
+        closeAddProfileModal();
+      } catch (err) {
+        addProfileError.textContent = err.message || 'Failed to create profile';
+        addProfileError.classList.add('show');
+      } finally {
+        createBtn.disabled = false;
+        createBtn.textContent = 'Create Profile';
+      }
+    });
+  
+    // Avatar upload handler for Add Profile with auto-compression
+    function compressProfileAvatar(file, maxDim, quality, callback) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let w = img.width;
+          let h = img.height;
+          if (w > h) {
+            if (w > maxDim) { h = Math.round((h * maxDim) / w); w = maxDim; }
+          } else {
+            if (h > maxDim) { w = Math.round((w * maxDim) / h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          callback(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    const newAvatarFileInput = document.getElementById('newAvatarFile');
+    const newAvatarUrlInput = document.getElementById('newAvatar');
+    if (newAvatarFileInput) {
+      newAvatarFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        compressProfileAvatar(file, 256, 0.86, (compressedDataUrl) => {
+          if (newAvatarUrlInput) newAvatarUrlInput.value = compressedDataUrl;
+          const prev = document.getElementById('newAvatarPreview');
+          const wrap = document.getElementById('newAvatarPreviewWrap');
+          if (prev) prev.src = compressedDataUrl;
+          if (wrap) wrap.style.display = 'flex';
+        });
+      });
+    }
+    if (newAvatarUrlInput) {
+      newAvatarUrlInput.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        const prev = document.getElementById('newAvatarPreview');
+        const wrap = document.getElementById('newAvatarPreviewWrap');
+        if (val && prev && wrap) {
+          prev.src = val;
+          wrap.style.display = 'flex';
+        } else if (wrap) {
+          wrap.style.display = 'none';
+        }
+      });
+    }
+</script>
+</body>
+</html>
