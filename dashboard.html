@@ -1516,8 +1516,9 @@
           <div id="salaryStatsGrid" class="stats-grid"></div>
 
           <div class="panel-card">
-            <div class="panel-title">
+            <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
               <span>Pending Payouts</span>
+              <button type="button" id="btnManualPayout" class="btn btn-sm btn-primary" onclick="openManualPayoutModal()" style="font-size:11px; padding:3px 10px; display:none;">+ Record Payout</button>
             </div>
             <div id="payoutListMain"></div>
           </div>
@@ -2200,14 +2201,18 @@
   <div id="markPaidModal" class="modal">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title">Mark Payout as Paid</h3>
+        <h3 class="modal-title" id="markPaidModalTitle">Mark Payout as Paid</h3>
         <button type="button" class="modal-close-btn" onclick="closeMarkPaidModal()">✕</button>
       </div>
       <form id="markPaidForm" onsubmit="confirmMarkAsPaid(event)" class="form-grid">
         <input type="hidden" id="payoutToMarkId">
         <input type="hidden" id="payoutToMarkUserId">
+        <div class="form-field" id="payoutUserSelectGroup" style="display:none;">
+          <label>Select Admin</label>
+          <select id="payoutTargetAdminSelect" class="select-control"></select>
+        </div>
         <div class="form-field">
-          <label>Payout Amount (Editable for Bonus / Partial)</label>
+          <label id="payoutAmountLabel">Payout Amount (Editable for Bonus / Partial)</label>
           <input type="number" id="payoutToMarkAmount" class="input-control" step="0.01" min="0" required>
         </div>
         <div class="form-field">
@@ -5085,10 +5090,47 @@
       }).join('');
     }
 
+    function openManualPayoutModal() {
+      if (!isOwner()) return;
+      document.getElementById('payoutToMarkId').value = '';
+      const adminUsers = users.filter(u => (u.role || '').toLowerCase() === 'admin');
+      if (adminUsers.length === 0) {
+        showToast('No admin users found', 'error');
+        return;
+      }
+      const selectGroup = document.getElementById('payoutUserSelectGroup');
+      const select = document.getElementById('payoutTargetAdminSelect');
+      if (selectGroup && select) {
+        select.innerHTML = adminUsers.map(u => {
+          const name = (u.customName || u.username).replace(/^@/, '');
+          return `<option value="${u.id}">${name} (@${u.username})</option>`;
+        }).join('');
+        selectGroup.style.display = 'block';
+        document.getElementById('payoutToMarkUserId').value = select.value;
+        select.onchange = () => {
+          document.getElementById('payoutToMarkUserId').value = select.value;
+        };
+      }
+      document.getElementById('payoutToMarkAmount').value = '';
+      document.getElementById('paymentReference').value = '';
+      document.getElementById('paymentNotes').value = '';
+      const titleEl = document.getElementById('markPaidModalTitle');
+      if (titleEl) titleEl.textContent = 'Record Admin Payout';
+      const amtLbl = document.getElementById('payoutAmountLabel');
+      if (amtLbl) amtLbl.textContent = 'Payout Amount (₱)';
+      document.getElementById('markPaidModal').classList.add('show');
+    }
+
     function openMarkPaidModal(payoutId, userId, amount) {
       document.getElementById('payoutToMarkId').value = payoutId;
       document.getElementById('payoutToMarkUserId').value = userId;
       document.getElementById('payoutToMarkAmount').value = Number(amount).toFixed(2);
+      const selectGroup = document.getElementById('payoutUserSelectGroup');
+      if (selectGroup) selectGroup.style.display = 'none';
+      const titleEl = document.getElementById('markPaidModalTitle');
+      if (titleEl) titleEl.textContent = 'Mark Payout as Paid';
+      const amtLbl = document.getElementById('payoutAmountLabel');
+      if (amtLbl) amtLbl.textContent = 'Payout Amount (Editable for Bonus / Partial)';
       document.getElementById('markPaidModal').classList.add('show');
     }
     function closeMarkPaidModal() { document.getElementById('markPaidModal').classList.remove('show'); }
@@ -5110,7 +5152,11 @@
         id: historyId, userId, amount, method, reference, notes,
         period: currentPayoutPeriod, paidDate, timestamp: historyId
       }).then(() => {
-        return getRef('payouts/' + payoutId).update({ amount, status: 'paid', paidDate, method, reference });
+        if (payoutId) {
+          return getRef('payouts/' + payoutId).update({ amount, status: 'paid', paidDate, method, reference });
+        } else {
+          return getRef('payouts/' + historyId).set({ id: historyId, userId, amount, status: 'paid', paidDate, method, reference, date: paidDate });
+        }
       }).then(() => {
         closeMarkPaidModal();
         loadPayoutHistory();
@@ -5152,10 +5198,24 @@
     }
 
     function deletePayoutHistory(historyId) {
-      if (!isOwner() || !confirm('Delete this payout history record?')) return;
-      getRef('payoutHistory/' + historyId).remove().then(() => {
-        loadPayoutHistory();
-        showToast('Payout record deleted');
+      if (!isOwner() || !confirm('Delete this payout history record? The amount will return to Pending Payouts so you can re-record it.')) return;
+      showSyncingIndicator();
+      getRef('payoutHistory/' + historyId).once('value', (snap) => {
+        const histData = snap.val();
+        getRef('payoutHistory/' + historyId).remove().then(() => {
+          if (historyId) {
+            getRef('payouts/' + historyId).remove();
+          }
+          if (histData && histData.userId) {
+            const match = payouts.find(p => String(p.userId) === String(histData.userId) && p.status === 'paid' && Number(p.amount) === Number(histData.amount));
+            if (match) {
+              getRef('payouts/' + match.id).remove();
+            }
+          }
+          loadPayoutHistory();
+          autoCalculatePayouts();
+          showToast('Payout record deleted & returned to Pending');
+        });
       });
     }
 
